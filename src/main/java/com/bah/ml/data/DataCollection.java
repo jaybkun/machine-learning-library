@@ -1,5 +1,8 @@
 package com.bah.ml.data;
 
+import com.bah.ml.data.C45.C45Loader;
+import org.apache.log4j.helpers.Loader;
+
 import java.security.InvalidParameterException;
 import java.util.*;
 
@@ -11,15 +14,6 @@ public class DataCollection {
     public DataCollection() {
         dataPoints = new ArrayList<DataPoint>();
         labels = new Hashtable<String, Integer>();
-    }
-
-    public DataCollection(String c45File) {
-        dataPoints = new ArrayList<DataPoint>(C45Loader.loadCSV(c45File));
-        labels = new Hashtable<String, Integer>();
-
-        for (DataPoint dataPoint : dataPoints) {
-            incLabelCount(dataPoint.getLabel());
-        }
     }
 
     /**
@@ -82,6 +76,16 @@ public class DataCollection {
             }
             dataPoints.add(dataPoint);
             incLabelCount(dataPoint.getLabel());
+        }
+    }
+
+    /**
+     *
+     * @param dataPoints
+     */
+    public void addDataPoints(List<DataPoint> dataPoints) {
+        for (DataPoint dataPoint : dataPoints) {
+            this.addDataPoint(dataPoint);
         }
     }
 

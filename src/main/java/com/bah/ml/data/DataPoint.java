@@ -1,50 +1,60 @@
 package com.bah.ml.data;
 
-import org.apache.log4j.Logger;
-
-import java.math.BigDecimal;
-import java.text.DecimalFormat;
-import java.text.ParseException;
-import java.util.*;
+import com.bah.utils.Distance;
 
 public class DataPoint {
+    public double[] getData() {
+        return data;
+    }
 
-        static Logger log = Logger.getLogger(
-                DataPoint.class.getName());
+    public double getData(int idx) {
+        return data[idx];
+    }
 
-        private ArrayList<BigDecimal> data;
-        private final String label;
+    public String getLabel() {
+        return label;
+    }
 
-        public DataPoint(ArrayList<BigDecimal> data, String label) {
-                this.data = data;
-                this.label = label;
+    private final double[] data;
+    private final String label;
+
+    public enum C45_TYPES {
+        continuous,
+        discrete,
+        ignore
+    }
+
+    /**
+     * Copy Constructor
+     * @param dataPoint
+     */
+    public DataPoint(DataPoint dataPoint) {
+        this.data = dataPoint.getData();
+        this.label = dataPoint.getLabel();
+    }
+
+    public DataPoint(double[] data, String label) {
+        this.data = data;
+        this.label = label;
+    }
+
+    public DataPoint(String[] rawData) throws RuntimeException {
+        try {
+            data  =  new double[rawData.length - 1];
+            for (int i = 0; i < data.length; i++) {
+                data[i] = Double.valueOf(rawData[i]);
+            }
+            label = new String(rawData[rawData.length - 1]);
+        } catch (Exception e) {
+            throw new RuntimeException("Encountered invalid data while creating the datapoint");
         }
+    }
 
-        public DataPoint(String[] rawData) {
-                data  = new ArrayList<BigDecimal>();
-                label = new String(rawData[rawData.length - 1]);
+    public int getDimensions() {
+        return data.length;
+    }
 
-                try {
-                        DecimalFormat df = new DecimalFormat();
-                        df.setParseBigDecimal(true);
-                        for (int i = 0; i < (rawData.length - 1); i++) {
-                                data.add((BigDecimal)df.parse(rawData[i]));
-                        }
-
-                } catch (ParseException pe) {
-                        log.error(pe);
-                }
-        }
-
-        public String getLabel() {
-                return label;
-        }
-
-        public List<BigDecimal> getData() {
-                return data;
-        }
-
-        public int getDimensions() {
-                return data.size();
-        }
+    public double distanceTo(DataPoint dataPoint) {
+        return Distance.euclidean(this.data, dataPoint.data);
+    }
 }
