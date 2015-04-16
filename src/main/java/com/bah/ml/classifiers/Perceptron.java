@@ -164,7 +164,7 @@ public class Perceptron {
 
     private double inner_product(double[] d1, double[] d2, double initial) throws InvalidParameterException
     {
-        if (d1.length != d1.length) {
+        if (d1.length != d2.length) {
             throw new InvalidParameterException("The arrays are not the same length");
         }
         
