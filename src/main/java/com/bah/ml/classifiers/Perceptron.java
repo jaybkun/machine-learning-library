@@ -6,10 +6,7 @@ import com.bah.ml.data.DataPoint;
 import org.apache.log4j.Logger;
 
 import java.security.InvalidParameterException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Random;
+import java.util.*;
 
 /**
  * Perceptron description
@@ -129,38 +126,152 @@ public class Perceptron {
         }
     }
 
-    private void train(DataCollection trainingData) {
-        log.debug("Training " + trainingData.getSize() + " data points");
-        
+    private void train(DataCollection data) {
+
+        log.debug("Training " + data.getSize() + " data points");
+
+        // Determine targets
         if (targets.size() == 0) {
-            targets.addAll(trainingData.getLabels().keySet());
+            targets.addAll(data.getLabels().keySet());
         }
-        
+
+        Random rand = new Random();
+
         for (String target: targets) {
 
-            // Initialization Step
-            Double foldBias = -1.0;
-            Random rand = new Random();
+            double fBestError = 1.0;
+            double[] bestWeights = new double[data.getDims()];
+            Arrays.fill(bestWeights, 1.0);
 
-            double[] weights = new double[trainingData.getDims()];
-            Arrays.fill(weights, rand.nextDouble());
-            
-            int iteration = 0;
-            double errorRate = 1.0;
+            for (int iFold = 0; iFold < kFolds; iFold++) {
+                log.debug("Training on fold: " + iFold + " of " + kFolds);
 
-            while (iteration++ <= maxIterations && errorRate >= minError) {
+                // Split the data into testing and training
+                DataCollection[] split = splitData(data, .10);
 
-                double[] calcWeights = new double[trainingData.getDims()];
-                Arrays.fill(calcWeights, 0.0);
-                
-                double value = 0.0;
-                
-                for (DataPoint dataPoint : trainingData.getDataPoints()) {
-                    value += inner_product(dataPoint.getData(), weights);
+                DataCollection trainingData = split[0];
+                DataCollection testData = split[1];
+
+                // Initialization Step
+                //double fFoldBias = 1.0;
+                double[] foldWeights = new double[trainingData.getDims()];
+                //Arrays.fill(foldWeights, rand.nextDouble());
+                Arrays.fill(foldWeights, 1.0);
+
+                int iteration = 0;
+                double errorRate = 1.0;
+
+                int iCorrect = 0;
+                int iError = 0;
+
+                // Generate the candidate solution
+                while (iteration++ <= maxIterations && errorRate >= minError) {
+
+                    double lr = (randomLearning ? rand.nextDouble() : getLearningRate());
+
+                    for (DataPoint dataPoint : trainingData.getDataPoints()) {
+                        double score = inner_product(dataPoint.getData(), foldWeights);
+                        boolean bMatch = target.equals(dataPoint.getLabel());
+
+                        // Update the weights
+                        if (score > 0.0 && !bMatch) {
+                            iError++;
+                            //fFoldBias--;
+
+                            for (int idx = 0; idx < trainingData.getDims(); idx++) {
+                                foldWeights[idx] -= lr * dataPoint.getData()[idx];
+                            }
+                        } else if (score <= 0 && bMatch) {
+                            iError++;
+                            //fFoldBias++;
+
+                            for (int idx = 0; idx < trainingData.getDims(); idx++) {
+                                foldWeights[idx] += lr * dataPoint.getData()[idx];
+                            }
+                        } else {
+                            iCorrect++;
+                        }
+                    }
+
+                    // Calculate the error rate
+                    errorRate = (double)iError / (iError + iCorrect);
                 }
+
+                // Test the candidate solution
+                int falsePositive = 0;
+                int falseNegative = 0;
+                int truePositive = 0;
+                int trueNegative = 0;
+
+                for (DataPoint dataPoint : testData.getDataPoints()) {
+                    double testScore = fitness(dataPoint, foldWeights);
+                    boolean bClassMatch = target.equals(dataPoint.getLabel());
+
+                    if (testScore > 0 && bClassMatch) {
+                        truePositive++;
+                    } else if (testScore > 0 && !bClassMatch) {
+                        falsePositive++;
+                    } else if (testScore <= 0 && bClassMatch) {
+                        falseNegative++;
+                    } else if (testScore <= 0 && !bClassMatch) {
+                        falsePositive++;
+                    }
+                }
+
+                double foldError = (double)(truePositive + trueNegative) / (testData.getSize());
+
+                System.out.println("Fold Error: " + foldError);
+                System.out.println(Arrays.toString(foldWeights));
+
+                if (foldError < fBestError) {
+                    fBestError = foldError;
+                    bestWeights = Arrays.copyOf(foldWeights, foldWeights.length);
+                    System.out.println("New Best");
+                }
+                System.out.println();
             }
         }
     }
+
+    private double fitness(DataPoint dataPoint, double[] solution) {
+        return inner_product(dataPoint.getData(), solution);
+    }
+
+    /**
+     * Randomly splits the contents of a DataCollection into 2 new DataCollections
+     * @param dataCollection Input
+     * @param percentage Percent of input values that are placed into the 0th data collection
+     *                   The value must be between 0.0 and 1.0
+     * @return
+     */
+    private DataCollection[] splitData(DataCollection dataCollection, double percentage) {
+        DataCollection[] data = new DataCollection[2];
+        data[0] = new DataCollection();
+        data[1] = new DataCollection();
+
+        ArrayList<Integer> indexes = new ArrayList<Integer>();
+        for (int idx = 0; idx < dataCollection.getSize(); idx++) {
+            indexes.add(idx);
+        }
+        Collections.shuffle(indexes);
+
+        int iLimit = (int)(percentage * dataCollection.getSize());
+
+        // Populate the first DataCollection
+        for (int idx = 0; idx < iLimit; idx++) {
+            int dataIdx = indexes.get(idx);
+            data[0].addDataPoint(dataCollection.getDataPoints().get(dataIdx));
+        }
+
+        // Populate the second DataCollection
+        for (int idx = iLimit; idx < dataCollection.getSize(); idx++) {
+            int dataIdx = indexes.get(idx);
+            data[1].addDataPoint(dataCollection.getDataPoints().get(dataIdx));
+        }
+
+        return data;
+    };
+
 
     private double inner_product(double[] d1, double[] d2, double initial) throws InvalidParameterException
     {
